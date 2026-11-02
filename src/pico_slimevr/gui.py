@@ -74,10 +74,37 @@ def run_gui() -> int:
         refresh()
         messagebox.showinfo("Готово", "Безопасные исправления применены.")
 
+    def apply_roles() -> None:
+        report = doctor.apply_roles()
+        for action in report.applied:
+            tag = "изменено" if action.changed else "пропущено"
+            log.insert("end", f"\n{action.title}: {tag} — {action.message}")
+        refresh()
+
+    def save_osc() -> None:
+        from tkinter import filedialog
+
+        from . import osc
+
+        target = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            initialfile="vrchat_osc.json",
+            filetypes=[("JSON", "*.json")],
+        )
+        if not target:
+            return
+        path = doctor.write_osc_profile(Path(target))
+        for check in osc.check_ports():
+            state = "свободен" if check.free else "занят"
+            log.insert("end", f"\nUDP {check.port}: {state}")
+        log.insert("end", f"\nШаблон OSC: {path}")
+
     buttons = ttk.Frame(root)
     buttons.pack(fill="x", padx=12, pady=(0, 12))
     ttk.Button(buttons, text="Проверить", command=refresh).pack(side="left")
     ttk.Button(buttons, text="Исправить", command=apply_fixes).pack(side="left", padx=8)
+    ttk.Button(buttons, text="Роли трекеров", command=apply_roles).pack(side="left")
+    ttk.Button(buttons, text="Шаблон OSC", command=save_osc).pack(side="left", padx=8)
     ttk.Button(buttons, text="Выход", command=root.destroy).pack(side="right")
 
     refresh()

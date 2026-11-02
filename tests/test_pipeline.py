@@ -37,6 +37,21 @@ def fake_machine(tmp_path: Path):
     openvrpaths.parent.mkdir(parents=True)
     openvrpaths.write_text(json.dumps({"external_drivers": []}), encoding="utf-8")
 
+    vrsettings = program_x86 / "Steam" / "config" / "steamvr.vrsettings"
+    vrsettings.parent.mkdir(parents=True)
+    vrsettings.write_text(
+        json.dumps(
+            {
+                "trackers": {
+                    "/devices/SlimeVR/human://LEFT_FOOT": "TrackerRole_Handed",
+                    "/devices/SlimeVR/human://RIGHT_FOOT": "TrackerRole_RightFoot",
+                    "/devices/SlimeVR/human://WAIST": "TrackerRole_Waist",
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
     slime = local / "Programs" / "SlimeVR"
     (slime / "feeder").mkdir(parents=True)
     (slime / "slimevr.exe").write_text("", encoding="utf-8")
@@ -51,6 +66,7 @@ def fake_machine(tmp_path: Path):
         "pico_swift": pico / "openvr_driver" / "resources" / "input" / "swift",
         "settings": settings,
         "openvrpaths": openvrpaths,
+        "vrsettings": vrsettings,
         "slime_driver": slime / "slimevr",
     }
 
@@ -166,6 +182,96 @@ def test_full_repair_then_all_ok(fake_machine):
     # The swift profiles are intentionally left for manual copying.
     remaining = {c.name for c in report.checks if not c.ok}
     assert remaining == {"Профили трекеров (swift)"}
+
+
+def test_scan_finds_vrsettings(fake_machine):
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    assert env.vrsettings_file == fake_machine["vrsettings"]
+
+
+def test_role_check_flags_disabled_tracker(fake_machine):
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    by_name = {c.name: c for c in detect.checks(env)}
+    roles = by_name["Роли трекеров в SteamVR"]
+    assert not roles.ok
+    assert "LEFT_FOOT" in roles.detail
+
+
+def test_apply_roles_fixes_and_backs_up(fake_machine):
+    from pico_slimevr import trackers
+
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    result = trackers.apply_roles(env)
+    assert result.changed
+    data = json.loads(fake_machine["vrsettings"].read_text(encoding="utf-8"))
+    assert data["trackers"]["/devices/SlimeVR/human://LEFT_FOOT"] == "TrackerRole_LeftFoot"
+    assert fake_machine["vrsettings"].with_suffix(".vrsettings.bak").is_file()
+    # Idempotent on a second pass.
+    assert not trackers.apply_roles(env).changed
+
+
+def test_apply_roles_subset_only(fake_machine):
+    from pico_slimevr import trackers
+
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    trackers.apply_roles(env, points=["WAIST"], dry_run=True)
+    data = json.loads(fake_machine["vrsettings"].read_text(encoding="utf-8"))
+    assert data["trackers"]["/devices/SlimeVR/human://LEFT_FOOT"] == "TrackerRole_Handed"
+
+
+def test_osc_profile_roundtrip(tmp_path):
+    from pico_slimevr import osc
+
+    target = tmp_path / "nested" / "vrchat_osc.json"
+    osc.write_profile(target)
+    data = json.loads(target.read_text(encoding="utf-8"))
+    assert data["send_port"] == 9000
+    assert data["receive_port"] == 9001
+    assert "Waist" in data["trackers"]
+
+
+def test_osc_port_check_reports_free_port():
+    import socket
+
+    from pico_slimevr import osc
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    try:
+        assert not osc.check_port(port).free
+    finally:
+        sock.close()
+    assert osc.check_port(port).free
+
+
+def test_firewall_commands_cover_both_ports():
+    from pico_slimevr import osc
+
+    commands = osc.firewall_commands()
+    assert len(commands) == 2
+    assert any("9000" in c for c in commands)
+    assert any("9001" in c for c in commands)
 
 
 def test_swift_profiles_recognised_when_present(fake_machine):

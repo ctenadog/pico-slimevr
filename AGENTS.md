@@ -21,12 +21,17 @@ Anything that claims to "read Pico trackers directly" is wrong for this hardware
 - `src/pico_slimevr/paths.py` — path discovery (env-var driven, all overridable).
 - `src/pico_slimevr/detect.py` — read-only `scan()` + `checks()`, returns dataclasses.
 - `src/pico_slimevr/actions.py` — idempotent fixes; every write makes a `.bak`.
-- `src/pico_slimevr/doctor.py` — `scan()` / `run(fix=...)`.
+- `src/pico_slimevr/trackers.py` — SteamVR tracker roles in `steamvr.vrsettings`.
+- `src/pico_slimevr/osc.py` — VRChat OSC profile + port checks (9000/9001).
+- `src/pico_slimevr/doctor.py` — `scan()` / `run(fix=...)` / `apply_roles()`.
 - `src/pico_slimevr/cli.py` / `gui.py` — entry points.
+- `packaging/` — PyInstaller spec + `build.py`; CI in `.github/workflows/build.yml`.
 
 ## Conventions
 - No third-party runtime dependencies (stdlib only); Tkinter is optional and imported lazily.
 - Tests use real temp dirs via the `fake_machine` fixture, never mocks. Run: `python -m pytest -q`.
-- `--fix` only does safe things: patch `bodyTracking` and register the SlimeVR driver.
-  The `swift` profile files are PICO-licensed and must be copied manually — do not bundle them.
+- `--fix` only does safe things: patch `bodyTracking`, register the SlimeVR driver, set tracker
+  roles. The `swift` profile files are PICO-licensed and must be copied manually — do not bundle them.
+- Tracker roles live in `<Steam>/config/steamvr.vrsettings` under a `trackers` object; device keys
+  look like `/devices/SlimeVR/human://LEFT_FOOT` and values like `TrackerRole_LeftFoot`.
 - All user-facing text is Russian.

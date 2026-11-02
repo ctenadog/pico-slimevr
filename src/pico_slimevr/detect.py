@@ -49,6 +49,7 @@ class Environment:
     steamvr_dir: Path | None = None
     steamvr_drivers_dir: Path | None = None
     vrpathreg_exe: Path | None = None
+    vrsettings_file: Path | None = None
     openvrpaths_file: Path | None = None
     openvr_external_drivers: list[str] = field(default_factory=list)
     slimevr_dir: Path | None = None
@@ -119,6 +120,7 @@ def scan(
         env.steamvr_drivers_dir = paths.steamvr_drivers_dir(steamvr)
         env.vrpathreg_exe = paths.vrpathreg_exe(steamvr)
         env.steamvr_driver_slimevr = env.steamvr_drivers_dir / "slimevr"
+    env.vrsettings_file = paths.steamvr_vrsettings(steam_roots)
 
     openvrpaths = paths.openvrpaths_file(local)
     if openvrpaths is not None:
@@ -272,7 +274,68 @@ def checks(env: Environment) -> list[Check]:
     else:
         result.append(Check("SlimeVR Feeder App", True, str(env.slimevr_feeder_exe)))
 
+    result.extend(_role_checks(env))
+    result.extend(_osc_checks(env))
+
     return result
+
+
+def _role_checks(env: Environment) -> list[Check]:
+    from . import trackers
+
+    entries = trackers.list_trackers(env)
+    if not entries:
+        return [
+            Check(
+                "Роли трекеров в SteamVR",
+                False,
+                "Секция trackers пуста — запустите SteamVR с подключёнными трекерами, "
+                "затем повторите (или задайте роли через pico-slimevr --roles).",
+                fixable=env.vrsettings_file is not None,
+            )
+        ]
+
+    notes = trackers.problems(entries)
+    if notes:
+        return [
+            Check(
+                "Роли трекеров в SteamVR",
+                False,
+                " ; ".join(notes),
+                fixable=True,
+            )
+        ]
+    return [
+        Check(
+            "Роли трекеров в SteamVR",
+            True,
+            f"Найдено трекеров: {len(entries)}, роли корректны.",
+        )
+    ]
+
+
+def _osc_checks(env: Environment) -> list[Check]:
+    from . import osc
+
+    checks = osc.check_ports()
+    busy = [c for c in checks if not c.free]
+    if busy:
+        ports = ", ".join(str(c.port) for c in busy)
+        return [
+            Check(
+                "VRChat OSC порты (9000/9001)",
+                True,
+                f"Порты {ports} заняты — вероятно, OSC уже запущен (это нормально).",
+            )
+        ]
+    return [
+        Check(
+            "VRChat OSC порты (9000/9001)",
+            True,
+            "Свободны. Включите OSC в SlimeVR и в VRChat, если нужен FBT через OSC.",
+        )
+    ]
+
 
 
 def _driver_registered(env: Environment) -> bool | None:

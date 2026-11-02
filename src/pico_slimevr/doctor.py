@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from . import actions, detect
+from . import actions, detect, osc, trackers
 
 
 @dataclass
@@ -32,9 +32,26 @@ def run(fix: bool = False, dry_run: bool = False, **kwargs) -> Report:
     if fix:
         applied.append(actions.enable_body_tracking(env, dry_run=dry_run))
         applied.append(actions.register_slimevr_driver(env, dry_run=dry_run))
+        role_result = trackers.apply_roles(env, dry_run=dry_run)
+        applied.append(actions.Action("Роли трекеров в SteamVR", role_result.changed, role_result.message))
 
     checks = detect.checks(env)
     return Report(env=env, checks=checks, applied=applied)
+
+
+def apply_roles(points: list[str] | None = None, dry_run: bool = False, **kwargs) -> Report:
+    """Set tracker roles only, leaving the rest of the pipeline untouched."""
+    env = detect.scan(**kwargs)
+    result = trackers.apply_roles(env, points=points, dry_run=dry_run)
+    return Report(
+        env=env,
+        checks=detect.checks(env),
+        applied=[actions.Action("Роли трекеров в SteamVR", result.changed, result.message)],
+    )
+
+
+def write_osc_profile(path: Path, **kwargs) -> Path:
+    return osc.write_profile(path, **kwargs)
 
 
 def default_paths() -> dict[str, Path | None]:

@@ -82,6 +82,24 @@ def steamvr_dir(steam_roots: list[Path] | None = None) -> Path | None:
     return _first_existing(steamvr_dirs(steam_roots))
 
 
+def steam_config_dirs(steam_roots: list[Path] | None = None) -> list[Path]:
+    """``<Steam>/config`` holds ``steamvr.vrsettings`` (tracker roles live here)."""
+    roots = steam_roots if steam_roots is not None else _default_steam_roots()
+    return [root / "config" for root in roots]
+
+
+def steamvr_vrsettings(steam_roots: list[Path] | None = None) -> Path | None:
+    """Return the vrsettings file if present, else the first plausible path."""
+    candidates = [cfg / "steamvr.vrsettings" for cfg in steam_config_dirs(steam_roots)]
+    existing = _first_existing(candidates)
+    if existing is not None:
+        return existing
+    for candidate in candidates:
+        if candidate.parent.is_dir():
+            return candidate
+    return None
+
+
 def steamvr_drivers_dir(steamvr: Path) -> Path:
     return steamvr / "drivers"
 

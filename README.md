@@ -53,13 +53,36 @@ pico-slimevr --gui      # графический интерфейс (Windows)
 * включает `bodyTracking = true` в
   `%APPDATA%\PICO Connect\settings.json` (перед правкой делает `.bak`);
 * регистрирует драйвер SlimeVR в SteamVR (`vrpathreg adddriver`, а если он
-  недоступен — добавляет путь в `openvrpaths.vrpath`).
+  недоступен — добавляет путь в `openvrpaths.vrpath`);
+* выставляет роли трекеров (`TrackerRole_Waist`, `..._LeftFoot`,
+  `..._RightFoot`, колени, грудь) в `steamvr.vrsettings`.
+
+Дополнительные команды:
+
+```bash
+pico-slimevr --roles                       # только роли трекеров
+pico-slimevr --roles WAIST,LEFT_FOOT       # только выбранные точки
+pico-slimevr --ports                       # проверить порты VRChat OSC (9000/9001)
+pico-slimevr --osc-profile vrchat_osc.json # записать шаблон настроек OSC
+```
 
 Чего инструмент **не** делает (и почему):
 
 * не копирует профили `swift` — они защищены лицензией PICO, их нужно
   положить вручную (см. ниже);
 * не трогает прошивку и не читает данные трекеров напрямую.
+
+## Сборка .exe для Windows
+
+Локально (на Windows):
+
+```bash
+pip install -e . pyinstaller
+python packaging/build.py     # → dist/pico-slimevr.exe
+```
+
+Или просто отправьте тег — GitHub Actions соберёт `pico-slimevr.exe`
+и приложит его к релизу (см. `.github/workflows/build.yml`).
 
 ## Ручные шаги, которые нужно сделать один раз
 
@@ -96,7 +119,8 @@ pico-slimevr --gui      # графический интерфейс (Windows)
 4. В SlimeVR: **Settings → SteamVR Trackers** — включите нужные виртуальные
    трекеры (Waist, Feet; Chest/Knees при необходимости).
 5. В SteamVR: **Settings → Controllers → Manage Trackers** — задайте роли
-   трекерам (Waist, Left foot, Right foot).
+   трекерам (Waist, Left foot, Right foot). Это можно сделать и командой
+   `pico-slimevr --roles`, но менять роли нужно при выключенном SteamVR.
 6. Сделайте **Reset** в SlimeVR, стоя прямо.
 
 ### 5. Игра
@@ -120,13 +144,16 @@ pico-slimevr --gui      # графический интерфейс (Windows)
 
 ```
 src/pico_slimevr/
-  paths.py    — поиск путей PICO Connect / SteamVR / SlimeVR
-  detect.py   — проверки без изменений (scan + checks)
-  actions.py  — безопасные исправления (idempotent, с бэкапами)
-  doctor.py   — scan / run / отчёт
-  cli.py      — командная строка
-  gui.py      — графический интерфейс (Tkinter)
-tests/        — тесты на реальной временной файловой системе
+  paths.py     — поиск путей PICO Connect / SteamVR / SlimeVR / vrsettings
+  detect.py    — проверки без изменений (scan + checks)
+  actions.py   — безопасные исправления (idempotent, с бэкапами)
+  trackers.py  — роли трекеров в steamvr.vrsettings
+  osc.py       — шаблон и порты VRChat OSC
+  doctor.py    — scan / run / apply_roles / отчёт
+  cli.py       — командная строка
+  gui.py       — графический интерфейс (Tkinter)
+packaging/     — PyInstaller spec и сборка .exe
+tests/         — тесты на реальной временной файловой системе
 ```
 
 ## Тесты
