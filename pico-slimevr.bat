@@ -7,19 +7,28 @@ cd /d "%~dp0"
 rem ------------------------------------------------------------------
 rem  pico-slimevr - launcher for Windows.  No Python required.
 rem
-rem  It downloads the ready-made pico-slimevr.exe once and runs it.
+rem  Downloads the ready-made pico-slimevr.exe once and runs it.
+rem  Bump STAMP whenever a new build must replace an older exe.
 rem  Usage:  pico-slimevr.bat [--fix] [--dry-run] [--gui] [--explain] ...
 rem
 rem  Deliberately no labels / no goto: those break if the file ends up
 rem  with LF-only line endings. Only single-line conditionals below.
 rem ------------------------------------------------------------------
 
+set "STAMP=2026-11-02b"
 set "EXE=%~dp0pico-slimevr.exe"
+set "STAMPFILE=%~dp0pico-slimevr.stamp"
 set "URL=https://github.com/ctenadog/pico-slimevr/releases/latest/download/pico-slimevr.exe"
 
-if not exist "%EXE%" echo Downloading pico-slimevr.exe (one time, needs internet)...
-if not exist "%EXE%" powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri '%URL%' -OutFile '%EXE%' -UseBasicParsing } catch { exit 1 }"
-if not exist "%EXE%" curl -fsSL "%URL%" -o "%EXE%"
+set "OLD="
+set "NEED=1"
+if exist "%EXE%" if exist "%STAMPFILE%" set /p OLD=<"%STAMPFILE%"
+if exist "%EXE%" if exist "%STAMPFILE%" if "%OLD%"=="%STAMP%" set "NEED="
+
+if defined NEED echo Downloading pico-slimevr.exe (one time, needs internet)...
+if defined NEED powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; try { Invoke-WebRequest -Uri '%URL%' -OutFile '%EXE%' -UseBasicParsing } catch { exit 1 }"
+if defined NEED if not exist "%EXE%" curl -fsSL "%URL%" -o "%EXE%"
+if defined NEED if exist "%EXE%" echo %STAMP%>"%STAMPFILE%"
 
 if exist "%EXE%" "%EXE%" %*
 if exist "%EXE%" set "RC=%errorlevel%"
