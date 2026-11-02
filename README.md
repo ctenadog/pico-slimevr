@@ -1,5 +1,11 @@
 # pico-slimevr
 
+### ⬇️ [Скачать pico-slimevr.exe](https://github.com/ctenadog/pico-slimevr/releases/latest/download/pico-slimevr.exe)
+
+Готовый файл для Windows — скачайте и запустите (инструкция: [ЗАПУСК.md](ЗАПУСК.md)).
+
+---
+
 Настройка **PICO Motion Trackers** так, чтобы они работали через **SlimeVR Server**
 (как обычные Slime-трекеры), а не только как «сырые» Vive-трекеры в SteamVR.
 
