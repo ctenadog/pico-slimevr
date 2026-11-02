@@ -1,1 +1,2 @@
 *.exe binary
+*.bat text eol=crlf

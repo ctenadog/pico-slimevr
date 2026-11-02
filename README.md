@@ -1,8 +1,9 @@
 # pico-slimevr
 
-### ⬇️ [Скачать pico-slimevr.exe](https://github.com/ctenadog/pico-slimevr/releases/latest/download/pico-slimevr.exe)
+### ⬇️ [Скачать pico-slimevr.bat](https://github.com/ctenadog/pico-slimevr/raw/main/pico-slimevr.bat)
 
-Готовый файл для Windows — скачайте и запустите (инструкция: [ЗАПУСК.md](ЗАПУСК.md)).
+Простой файл-лаунчер для Windows. Двойной клик — и всё (поставит и запустит
+само, нужен только установленный Python). Инструкция: [ЗАПУСК.md](ЗАПУСК.md).
 
 ---
 
@@ -112,17 +113,26 @@ pip uninstall pico-slimevr
   положить вручную (см. ниже);
 * не трогает прошивку и не читает данные трекеров напрямую.
 
-## Сборка .exe для Windows
+## Запуск без установки: pico-slimevr.bat
 
-Локально (на Windows):
+В корне репозитория лежит `pico-slimevr.bat` — простой лаунчер для Windows.
+Скачайте его, положите в любую папку и запустите (двойным кликом или из
+PowerShell):
 
-```bash
-pip install -e . pyinstaller
-python packaging/build.py     # → dist/pico-slimevr.exe
+```powershell
+.\pico-slimevr.bat              # проверить
+.\pico-slimevr.bat --fix        # починить
+.\pico-slimevr.bat --gui        # окошко
 ```
 
-Или просто отправьте тег — GitHub Actions соберёт `pico-slimevr.exe`
-и приложит его к релизу (см. `.github/workflows/build.yml`).
+Что делает `.bat`:
+
+* ищет Python (`py -3`, затем `python`); если не нашёл — подсказывает, где скачать;
+* если рядом с ним лежит исходный код (`src\pico_slimevr`) — запускает прямо из него;
+* иначе один раз ставит программу через `pip` и запускает.
+
+Это обычный текстовый файл — его можно открыть в блокноте и прочитать.
+Требуется установленный **Python 3.10+**.
 
 ## Ручные шаги, которые нужно сделать один раз
 
@@ -192,8 +202,8 @@ src/pico_slimevr/
   doctor.py    — scan / run / apply_roles / отчёт
   cli.py       — командная строка
   gui.py       — графический интерфейс (Tkinter)
-packaging/     — PyInstaller spec и сборка .exe
 tests/         — тесты на реальной временной файловой системе
+pico-slimevr.bat — лаунчер для Windows
 ЗАПУСК.md      — пошаговая инструкция «что делает и как запустить»
 ```
 
