@@ -172,6 +172,124 @@ def _first_exe(directory: Path, names: list[str]) -> Path | None:
     return matches[0] if matches else None
 
 
+def _backup_of(path: Path) -> Path:
+    return path.with_suffix(path.suffix + ".bak")
+
+
+def restore_from_backup(path: Path, *, dry_run: bool) -> bool:
+    """Copy ``path.bak`` back over ``path``. Returns False if no backup exists."""
+    backup = _backup_of(path)
+    if not backup.is_file():
+        return False
+    if not dry_run:
+        shutil.copy2(backup, path)
+    return True
+
+
+def drop_backup(path: Path, *, dry_run: bool) -> bool:
+    """Delete the ``.bak`` file once a revert is complete. Returns True if removed."""
+    backup = _backup_of(path)
+    if not backup.is_file():
+        return False
+    if not dry_run:
+        backup.unlink()
+    return True
+
+
+def disable_body_tracking(env: Environment, *, dry_run: bool = False) -> Action:
+    """Undo :func:`enable_body_tracking`.
+
+    Prefers restoring the original file so unrelated settings survive exactly;
+    falls back to setting ``bodyTracking = false`` when there is no backup.
+    """
+    title = "Отключить bodyTracking"
+    path = env.pico_settings_file
+    if path is None or not path.is_file():
+        return Action(title, False, "settings.json PICO Connect не найден.")
+
+    if _backup_of(path).is_file():
+        if dry_run:
+            return Action(title, True, f"Будет восстановлен {_backup_of(path).name}")
+        restore_from_backup(path, dry_run=False)
+        env.pico_settings_data = None
+        return Action(title, True, f"Восстановлено из {_backup_of(path).name}")
+
+    data = env.pico_settings_data
+    if not isinstance(data, dict):
+        return Action(title, False, "settings.json не читается как JSON.")
+    if data.get("bodyTracking") is not True:
+        return Action(title, False, "Уже выключено.")
+
+    if dry_run:
+        return Action(title, True, "bodyTracking будет выставлен в false")
+
+    data["bodyTracking"] = False
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+    env.pico_settings_data = data
+    return Action(title, True, "bodyTracking = false")
+
+
+def unregister_slimevr_driver(env: Environment, *, dry_run: bool = False) -> Action:
+    """Undo :func:`register_slimevr_driver`."""
+    title = "Отключить драйвер SlimeVR от SteamVR"
+    driver = env.slimevr_driver_dir
+    if driver is None:
+        return Action(title, False, "Каталог драйвера SlimeVR не найден.")
+
+    removed_paths: list[str] = []
+    if env.vrpathreg_exe is not None and env.vrpathreg_exe.is_file():
+        if not dry_run:
+            try:
+                completed = subprocess.run(
+                    [str(env.vrpathreg_exe), "removedriver", str(driver)],
+                    capture_output=True,
+                    text=True,
+                )
+                if completed.returncode == 0:
+                    removed_paths.append("vrpathreg")
+            except OSError:
+                pass
+        else:
+            removed_paths.append("vrpathreg")
+
+    if _remove_external_driver(env, driver, dry_run=dry_run):
+        removed_paths.append("openvrpaths.vrpath")
+
+    if not removed_paths:
+        return Action(title, False, "Драйвер не был зарегистрирован.")
+    return Action(title, True, "Убрано из: " + ", ".join(removed_paths))
+
+
+def _remove_external_driver(env: Environment, driver: Path, *, dry_run: bool) -> bool:
+    path = env.openvrpaths_file
+    if path is None or not path.is_file():
+        return False
+    try:
+        with path.open("r", encoding="utf-8-sig") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+
+    drivers = data.get("external_drivers")
+    if not isinstance(drivers, list):
+        return False
+    target = str(driver).rstrip("\\/").lower()
+    kept = [item for item in drivers if str(item).rstrip("\\/").lower() != target]
+    if len(kept) == len(drivers):
+        return False
+
+    if dry_run:
+        return True
+    data["external_drivers"] = kept
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+    env.openvr_external_drivers = [str(item) for item in kept]
+    return True
+
+
 def _launch(title: str, exe: Path, dry_run: bool) -> Action:
     if dry_run:
         return Action(title, True, f"Будет запущен {exe.name}")

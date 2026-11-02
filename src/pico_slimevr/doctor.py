@@ -50,6 +50,30 @@ def apply_roles(points: list[str] | None = None, dry_run: bool = False, **kwargs
     )
 
 
+def uninstall(dry_run: bool = False, *, drop_backups: bool = False, **kwargs) -> Report:
+    """Undo everything ``run(fix=True)`` changed, restoring original files."""
+    env = detect.scan(**kwargs)
+    applied: list[actions.Action] = []
+
+    applied.append(actions.disable_body_tracking(env, dry_run=dry_run))
+    applied.append(actions.unregister_slimevr_driver(env, dry_run=dry_run))
+    role_result = trackers.revert_roles(env, dry_run=dry_run)
+    applied.append(
+        actions.Action("Роли трекеров в SteamVR", role_result.changed, role_result.message)
+    )
+
+    if drop_backups:
+        for path in (env.pico_settings_file, env.openvrpaths_file, env.vrsettings_file):
+            if path is None:
+                continue
+            if actions.drop_backup(path, dry_run=dry_run):
+                applied.append(
+                    actions.Action("Удалить бэкап", True, f"{actions._backup_of(path).name}")
+                )
+
+    return Report(env=env, checks=detect.checks(env), applied=applied)
+
+
 def write_osc_profile(path: Path, **kwargs) -> Path:
     return osc.write_profile(path, **kwargs)
 

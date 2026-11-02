@@ -27,6 +27,15 @@ SlimeVR Server            ── считает скелет по пропорц
 Итог: игра видит трекеры как SlimeVR, со скелетом и авто-пропорциями — то,
 что вы и хотели. Ниже — что поставить и как это настроить.
 
+## Как всё работает (коротко)
+
+```
+PICO Motion Trackers → шлем PICO → PICO Connect → SteamVR (эмулированные Vive-трекеры)
+   → SlimeVR Feeder App → SlimeVR Server → драйвер SlimeVR / VRChat OSC
+```
+
+Подробная схема и список изменяемых файлов — командой `pico-slimevr --explain`.
+
 ## Что нужно установить
 
 1. **PICO Connect** (стример PICO для ПК) — официальный сайт PICO.
@@ -60,11 +69,41 @@ pico-slimevr --gui      # графический интерфейс (Windows)
 Дополнительные команды:
 
 ```bash
+pico-slimevr --explain                     # как всё работает (схема + список файлов)
 pico-slimevr --roles                       # только роли трекеров
 pico-slimevr --roles WAIST,LEFT_FOOT       # только выбранные точки
 pico-slimevr --ports                       # проверить порты VRChat OSC (9000/9001)
 pico-slimevr --osc-profile vrchat_osc.json # записать шаблон настроек OSC
 ```
+
+## Как удалить (откат всех изменений)
+
+Инструмент меняет только три файла, и перед каждой правкой кладёт рядом копию
+`.bak`. Команда `--uninstall` возвращает эти файлы в исходное состояние:
+
+```bash
+pico-slimevr --uninstall --dry-run   # посмотреть, что будет откачено
+pico-slimevr --uninstall             # откатить (файлы восстанавливаются из .bak)
+pico-slimevr --uninstall --purge-backups   # откатить и удалить сами .bak
+```
+
+Что делает откат:
+
+* `%APPDATA%\PICO Connect\settings.json` — восстанавливается из `.bak`
+  (если бэкапа нет — просто ставится `bodyTracking = false`);
+* `%LOCALAPPDATA%\openvr\openvrpaths.vrpath` — путь к драйверу SlimeVR
+  убирается (плюс `vrpathreg removedriver`);
+* `<Steam>\config\steamvr.vrsettings` — роли трекеров восстанавливаются из
+  `.bak` или удаляются наши записи.
+
+Полное удаление самой программы:
+
+```bash
+pip uninstall pico-slimevr
+```
+
+Сами PICO Connect, SteamVR и SlimeVR инструмент не устанавливает и не удаляет —
+их удаляют их собственными деинсталляторами.
 
 Чего инструмент **не** делает (и почему):
 

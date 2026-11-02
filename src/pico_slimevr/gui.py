@@ -81,6 +81,19 @@ def run_gui() -> int:
             log.insert("end", f"\n{action.title}: {tag} — {action.message}")
         refresh()
 
+    def uninstall() -> None:
+        if not messagebox.askyesno(
+            "Откат",
+            "Вернуть все файлы в исходное состояние из бэкапов .bak?",
+        ):
+            return
+        report = doctor.uninstall()
+        for action in report.applied:
+            tag = "изменено" if action.changed else "пропущено"
+            log.insert("end", f"\n{action.title}: {tag} — {action.message}")
+        refresh()
+        messagebox.showinfo("Готово", "Изменения откатены. Перезапустите SteamVR.")
+
     def save_osc() -> None:
         from tkinter import filedialog
 
@@ -105,6 +118,7 @@ def run_gui() -> int:
     ttk.Button(buttons, text="Исправить", command=apply_fixes).pack(side="left", padx=8)
     ttk.Button(buttons, text="Роли трекеров", command=apply_roles).pack(side="left")
     ttk.Button(buttons, text="Шаблон OSC", command=save_osc).pack(side="left", padx=8)
+    ttk.Button(buttons, text="Откатить всё", command=uninstall).pack(side="left")
     ttk.Button(buttons, text="Выход", command=root.destroy).pack(side="right")
 
     refresh()

@@ -12,6 +12,48 @@ _GREEN = "\033[32m"
 _RED = "\033[31m"
 _RESET = "\033[0m"
 
+EXPLAIN = """Как это всё работает
+
+Протокол PICO-трекеров закрытый, поэтому данные с них нельзя читать напрямую.
+Мы не пишем новый драйвер — мы правильно соединяем готовые звенья:
+
+  PICO Motion Trackers (пояс + щиколотки)
+        |  шлем PICO
+        v
+  PICO Connect (ПК)     -- отдаёт трекеры в SteamVR как эмулированные Vive-трекеры
+        v
+  SteamVR               -- видит их как Vive Tracker
+        v
+  SlimeVR Feeder App    -- забирает позиции из SteamVR
+        v
+  SlimeVR Server        -- считает скелет по пропорциям тела
+        |-- SteamVR-драйвер SlimeVR  -> эмулирует Slime-трекеры в SteamVR
+        |-- VRChat OSC               -> трекеры напрямую в VRChat
+
+Что делает инструмент:
+
+  pico-slimevr              проверить всю цепочку (ничего не меняет)
+  pico-slimevr --fix        включить bodyTracking, подключить драйвер, выставить роли
+  pico-slimevr --dry-run    показать, что будет изменено
+  pico-slimevr --roles      выставить роли трекеров в SteamVR
+  pico-slimevr --ports      проверить порты VRChat OSC (9000/9001)
+  pico-slimevr --osc-profile FILE   сохранить шаблон настроек OSC
+  pico-slimevr --uninstall  откатить всё, вернув файлы из бэкапов
+  pico-slimevr --gui        графический интерфейс
+
+Какие файлы меняются (каждый раз с копией .bak рядом):
+
+  %APPDATA%\\PICO Connect\\settings.json          bodyTracking = true
+  %LOCALAPPDATA%\\openvr\\openvrpaths.vrpath      путь к драйверу SlimeVR
+  <Steam>\\config\\steamvr.vrsettings              роли трекеров (TrackerRole_*)
+
+Откат: --uninstall возвращает эти файлы из .bak (или аккуратно отменяет правку,
+если бэкапа нет). Флаг --purge-backups удаляет и сами .bak-файлы.
+
+Чего инструмент не делает: не копирует профили swift (лицензия PICO),
+не шьёт трекеры и не читает данные с них напрямую.
+"""
+
 
 def _supports_color() -> bool:
     return sys.stdout.isatty()
@@ -23,6 +65,15 @@ def _mark(ok: bool) -> str:
     return f"{_GREEN}[OK]{_RESET}" if ok else f"{_RED}[!!]{_RESET}"
 
 
+def _render_actions(applied: list) -> None:
+    if not applied:
+        print("Нечего было менять.")
+        return
+    for action in applied:
+        tag = "изменено" if action.changed else "пропущено"
+        print(f"  - {action.title}: {tag} — {action.message}")
+
+
 def _render(report: doctor.Report) -> None:
     print("Проверка цепочки PICO Motion Tracker -> SlimeVR\n")
     for check in report.checks:
@@ -30,9 +81,7 @@ def _render(report: doctor.Report) -> None:
 
     if report.applied:
         print("\nИзменения:")
-        for action in report.applied:
-            tag = "изменено" if action.changed else "пропущено"
-            print(f"  - {action.title}: {tag} — {action.message}")
+        _render_actions(report.applied)
 
     print()
     if report.ok:
@@ -61,13 +110,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--osc-profile", metavar="ФАЙЛ", help="записать шаблон VRChat OSC в файл")
     parser.add_argument("--ports", action="store_true", help="проверить порты VRChat OSC")
+    parser.add_argument(
+        "--uninstall",
+        action="store_true",
+        help="откатить все изменения (вернуть файлы из бэкапов)",
+    )
+    parser.add_argument(
+        "--purge-backups",
+        action="store_true",
+        help="вместе с --uninstall удалить и файлы .bak",
+    )
+    parser.add_argument("--explain", action="store_true", help="как всё работает")
     parser.add_argument("--version", action="version", version=f"pico-slimevr {__version__}")
     args = parser.parse_args(argv)
+
+    if args.explain:
+        print(EXPLAIN)
+        return 0
 
     if args.gui:
         from .gui import run_gui
 
         return run_gui()
+
+    if args.uninstall:
+        report = doctor.uninstall(dry_run=args.dry_run, drop_backups=args.purge_backups)
+        _render_actions(report.applied)
+        print()
+        print("Откат завершён. Перезапустите SteamVR." if not args.dry_run else "Это был предпросмотр (--dry-run).")
+        return 0
 
     if args.osc_profile:
         path = doctor.write_osc_profile(Path(args.osc_profile))

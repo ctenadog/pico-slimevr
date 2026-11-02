@@ -274,6 +274,123 @@ def test_firewall_commands_cover_both_ports():
     assert any("9001" in c for c in commands)
 
 
+def test_uninstall_restores_originals(fake_machine):
+    from pico_slimevr import doctor
+
+    kwargs = dict(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    # Capture the pre-fix state.
+    original_settings = fake_machine["settings"].read_text(encoding="utf-8")
+    original_vrsettings = fake_machine["vrsettings"].read_text(encoding="utf-8")
+
+    doctor.run(fix=True, **kwargs)
+    assert json.loads(fake_machine["settings"].read_text(encoding="utf-8"))["bodyTracking"] is True
+
+    report = doctor.uninstall(**kwargs)
+    assert any(a.changed for a in report.applied)
+    # Files are byte-identical to before --fix.
+    assert fake_machine["settings"].read_text(encoding="utf-8") == original_settings
+    assert fake_machine["vrsettings"].read_text(encoding="utf-8") == original_vrsettings
+
+
+def test_uninstall_dry_run_changes_nothing(fake_machine):
+    from pico_slimevr import doctor
+
+    kwargs = dict(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    doctor.run(fix=True, **kwargs)
+    after_fix = fake_machine["settings"].read_text(encoding="utf-8")
+
+    doctor.uninstall(dry_run=True, **kwargs)
+    assert fake_machine["settings"].read_text(encoding="utf-8") == after_fix
+    assert fake_machine["settings"].with_suffix(".json.bak").is_file()
+
+
+def test_uninstall_purge_removes_backups(fake_machine):
+    from pico_slimevr import doctor
+
+    kwargs = dict(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    doctor.run(fix=True, **kwargs)
+    assert fake_machine["settings"].with_suffix(".json.bak").is_file()
+
+    doctor.uninstall(drop_backups=True, **kwargs)
+    assert not fake_machine["settings"].with_suffix(".json.bak").exists()
+    assert not fake_machine["vrsettings"].with_suffix(".vrsettings.bak").exists()
+
+
+def test_uninstall_without_backup_reverts_in_place(fake_machine):
+    from pico_slimevr import actions, detect
+
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    # Simulate a prior state where bodyTracking was turned on by hand (no .bak).
+    fake_machine["settings"].write_text(
+        json.dumps({"bodyTracking": True, "other": 1}), encoding="utf-8"
+    )
+    env.pico_settings_data = json.loads(fake_machine["settings"].read_text(encoding="utf-8"))
+
+    result = actions.disable_body_tracking(env)
+    assert result.changed
+    data = json.loads(fake_machine["settings"].read_text(encoding="utf-8"))
+    assert data["bodyTracking"] is False
+    assert data["other"] == 1  # unrelated settings preserved
+
+
+def test_unregister_driver_removes_external_entry(fake_machine):
+    from pico_slimevr import actions, detect
+
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    env.vrpathreg_exe = None  # force the openvrpaths path
+    actions.register_slimevr_driver(env)
+    assert str(fake_machine["slime_driver"]) in json.loads(
+        fake_machine["openvrpaths"].read_text(encoding="utf-8")
+    )["external_drivers"]
+
+    result = actions.unregister_slimevr_driver(env)
+    assert result.changed
+    assert str(fake_machine["slime_driver"]) not in json.loads(
+        fake_machine["openvrpaths"].read_text(encoding="utf-8")
+    )["external_drivers"]
+
+
+def test_revert_roles_removes_our_entries(fake_machine):
+    from pico_slimevr import detect, trackers
+
+    env = detect.scan(
+        program_roots=fake_machine["program"],
+        roaming=fake_machine["roaming"],
+        local=fake_machine["local"],
+        steam_roots=fake_machine["steam_roots"],
+    )
+    # No .bak yet -> revert drops our device keys.
+    result = trackers.revert_roles(env)
+    assert result.changed
+    data = json.loads(fake_machine["vrsettings"].read_text(encoding="utf-8"))
+    assert data["trackers"] == {}
+
+
 def test_swift_profiles_recognised_when_present(fake_machine):
     swift = fake_machine["pico_swift"]
     for name in SWIFT_PROFILE_FILES:

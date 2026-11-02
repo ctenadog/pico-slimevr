@@ -32,6 +32,9 @@ Anything that claims to "read Pico trackers directly" is wrong for this hardware
 - Tests use real temp dirs via the `fake_machine` fixture, never mocks. Run: `python -m pytest -q`.
 - `--fix` only does safe things: patch `bodyTracking`, register the SlimeVR driver, set tracker
   roles. The `swift` profile files are PICO-licensed and must be copied manually — do not bundle them.
+- `--uninstall` reverses `--fix`: it restores the three touched files from their `.bak` copies
+  (falling back to targeted in-place reversal when no backup exists). `--purge-backups` also
+  deletes the `.bak` files. Any new fix action must ship a matching revert action.
 - Tracker roles live in `<Steam>/config/steamvr.vrsettings` under a `trackers` object; device keys
   look like `/devices/SlimeVR/human://LEFT_FOOT` and values like `TrackerRole_LeftFoot`.
 - All user-facing text is Russian.

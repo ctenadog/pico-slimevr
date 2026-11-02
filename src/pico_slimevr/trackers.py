@@ -141,3 +141,40 @@ def apply_roles(
 class RoleResult:
     changed: bool
     message: str
+
+
+def revert_roles(env: Environment, *, dry_run: bool = False) -> RoleResult:
+    """Undo :func:`apply_roles`.
+
+    Restores the original ``steamvr.vrsettings`` when a backup exists, otherwise
+    removes our SlimeVR device keys so SteamVR falls back to auto-assignment.
+    """
+    from . import actions
+
+    vrsettings = env.vrsettings_file
+    if vrsettings is None or not vrsettings.is_file():
+        return RoleResult(False, "steamvr.vrsettings не найден.")
+
+    if actions._backup_of(vrsettings).is_file():
+        if dry_run:
+            return RoleResult(True, f"Будет восстановлен {actions._backup_of(vrsettings).name}")
+        actions.restore_from_backup(vrsettings, dry_run=False)
+        return RoleResult(True, f"Восстановлено из {actions._backup_of(vrsettings).name}")
+
+    entries = read_roles(vrsettings)
+    ours = [device for device, role in entries.items() if TrackerEntry(device, role).point]
+    if not ours:
+        return RoleResult(False, "Наших трекеров в vrsettings нет.")
+
+    if dry_run:
+        return RoleResult(True, f"Будет удалено записей: {len(ours)}")
+
+    with vrsettings.open("r", encoding="utf-8-sig") as handle:
+        data = json.load(handle)
+    trackers = data.get("trackers")
+    if isinstance(trackers, dict):
+        for device in ours:
+            trackers.pop(device, None)
+    with vrsettings.open("w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=3, ensure_ascii=False)
+    return RoleResult(True, f"Удалено записей: {len(ours)}")
