@@ -14,7 +14,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = ROOT / "packaging" / "pico-slimevr.spec"
 
 
+def _force_utf8_stdout() -> None:
+    """Windows consoles default to cp1252; Russian messages would crash."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def main() -> int:
+    _force_utf8_stdout()
     try:
         import PyInstaller  # noqa: F401
     except ImportError:

@@ -59,6 +59,16 @@ def _supports_color() -> bool:
     return sys.stdout.isatty()
 
 
+def _force_utf8_stdout() -> None:
+    """Windows consoles default to cp1252; Russian output would crash."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (ValueError, OSError):
+                pass
+
+
 def _mark(ok: bool) -> str:
     if not _supports_color():
         return "[OK]" if ok else "[!!]"
@@ -123,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--explain", action="store_true", help="как всё работает")
     parser.add_argument("--version", action="version", version=f"pico-slimevr {__version__}")
     args = parser.parse_args(argv)
+    _force_utf8_stdout()
 
     if args.explain:
         print(EXPLAIN)
