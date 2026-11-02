@@ -2,8 +2,9 @@
 
 ### ⬇️ [Скачать pico-slimevr.bat](https://github.com/ctenadog/pico-slimevr/raw/main/pico-slimevr.bat)
 
-Простой файл-лаунчер для Windows. Двойной клик — и всё (поставит и запустит
-само, нужен только установленный Python). Инструкция: [ЗАПУСК.md](ЗАПУСК.md).
+Простой файл-лаунчер для Windows. Двойной клик — и всё. **Python не нужен:**
+`.bat` сам скачает готовый `pico-slimevr.exe` и запустит его.
+Инструкция: [ЗАПУСК.md](ЗАПУСК.md).
 
 ---
 
@@ -127,12 +128,27 @@ PowerShell):
 
 Что делает `.bat`:
 
-* ищет Python (`py -3`, затем `python`); если не нашёл — подсказывает, где скачать;
-* если рядом с ним лежит исходный код (`src\pico_slimevr`) — запускает прямо из него;
-* иначе один раз ставит программу через `pip` и запускает.
+* один раз скачивает готовый `pico-slimevr.exe` из раздела Releases
+  (нужен интернет) и запускает его;
+* **Python не требуется**;
+* если скачать не удалось, но Python всё же установлен — запускает через него.
 
 Это обычный текстовый файл — его можно открыть в блокноте и прочитать.
-Требуется установленный **Python 3.10+**.
+
+Готовый `.exe` можно скачать и напрямую:
+`https://github.com/ctenadog/pico-slimevr/releases/latest/download/pico-slimevr.exe`
+
+## Сборка .exe для Windows
+
+Сборка идёт автоматически в GitHub Actions при каждом пуше в `main` и
+публикуется в релиз `latest` (см. `.github/workflows/build.yml`).
+
+Локально (на Windows):
+
+```bash
+pip install -e . pyinstaller
+python packaging/build.py     # → dist/pico-slimevr.exe
+```
 
 ## Ручные шаги, которые нужно сделать один раз
 
@@ -202,8 +218,9 @@ src/pico_slimevr/
   doctor.py    — scan / run / apply_roles / отчёт
   cli.py       — командная строка
   gui.py       — графический интерфейс (Tkinter)
+packaging/     — PyInstaller spec и сборка .exe
 tests/         — тесты на реальной временной файловой системе
-pico-slimevr.bat — лаунчер для Windows
+pico-slimevr.bat — лаунчер для Windows (скачивает и запускает .exe)
 ЗАПУСК.md      — пошаговая инструкция «что делает и как запустить»
 ```
 
