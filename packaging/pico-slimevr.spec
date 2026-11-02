@@ -10,11 +10,11 @@ ROOT = Path(SPECPATH).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 a = Analysis(
-    [str(ROOT / "src" / "pico_slimevr" / "cli.py")],
+    [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT / "src")],
     binaries=[],
     datas=[],
-    hiddenimports=["pico_slimevr.gui", "pico_slimevr.osc", "pico_slimevr.trackers"],
+    hiddenimports=["pico_slimevr.cli", "pico_slimevr.gui", "pico_slimevr.osc", "pico_slimevr.trackers"],
     hookspath=[],
     runtime_hooks=[],
     excludes=["numpy", "pandas", "matplotlib", "PIL"],
